@@ -1,0 +1,15 @@
+web:
+  build: .
+  working_dir: /usr/src/app
+  command: lein run
+  ports:
+   - "3000:3000"
+  volumes:
+   - .:/usr/src/app
+   - tmp/dev:/storage
+  environment:
+    BUCKET_STORAGE_MAP:
+    FILE_STORAGE_PATH: /storage
+    AWS_ACCESS_KEY:
+    AWS_SECRET_KEY:
+    HTTP_PORT: "3000"
