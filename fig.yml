@@ -1,9 +1,10 @@
-web:
+http:
   build: .
   working_dir: /usr/src/app
-  command: lein run
+  command: lein trampoline run dev
   ports:
    - "3000:3000"
+   - "7888:7888"
   volumes:
    - .:/usr/src/app
    - tmp/dev:/storage
