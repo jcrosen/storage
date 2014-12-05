@@ -13,8 +13,11 @@
                  [javax.servlet/servlet-api "2.5"]
                  [clojurewerkz/spyglass "1.1.0"]
                  [environ "1.0.0"]
-                 [clj-aws-s3 "0.3.10" :exclusions [joda-time]]]
+                 [clj-aws-s3 "0.3.10" :exclusions [joda-time]]
+                 [org.clojure/tools.nrepl "0.2.3"]
+                 [org.clojure/tools.namespace "0.2.4"]]
   :plugins [[lein-environ "1.0.0"]]
+  :app-class storage.core/app
   :main ^:skip-aot storage.core
-  :target-path "target/%s"
+  :target-path "tmp/"
   :profiles {:uberjar {:aot :all}})

@@ -1,6 +1,6 @@
 (ns storage.core
   (:refer-clojure :exclude [key])
-  (:require [environ.core :refer [env]]
+  (:require [environ.core :as environ]
             [ring.util.response :refer [response not-found content-type]]
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
@@ -12,19 +12,21 @@
             [org.httpkit.server :as s]
             [clojurewerkz.spyglass.client :as mc]
             [clojure.java.io :as io]
-            [storage.store :refer [gen-storage-proxy s-get s-put! s-delete! s-exists?]])
+            [clojure.tools.namespace.repl :refer [refresh]]
+            [storage.store :refer [gen-storage-proxy s-get s-put! s-delete! s-exists?]]
+            [storage.nrepl :refer [start-nrepl!]])
   (:import [org.apache.commons.io IOUtils]
            [storage.store FileStorage S3Storage])
   (:gen-class))
 
-(defn get-adapter-options []
+(defn get-adapter-options [env]
   (select-keys env [:aws-access-key :aws-secret-key :file-storage-path]))
 
-(defn get-bucket-storage-map []
+(defn get-bucket-storage-map [env]
   (or (edn/read-string (env :bucket-storage-map))
       {}))
 
-(defn gen-mc-conn []
+(defn gen-mc-conn [env]
   (when-let [memcached-servers (:memcached-servers env)]
     (let [memcached-user (:memcached-user env)
           memcached-pass (:memcached-pass env)]
@@ -59,12 +61,13 @@
 (defn srv-delete! [context token bucket key]
   (when-let [{:keys [storage memcached]} context]
     (s-delete! storage bucket key)
-    (mc/delete memcached (make-mc-key bucket key))
+    (when memcached
+      (mc/delete memcached (make-mc-key bucket key)))
     (response (str "Successfully deleted " bucket "/" key))))
 
 (defn gen-app-routes [context]
   (routes
-    (GET "/" request (str request))
+    (GET "/" request (str "<b>Echoes:</b><p>" request "</p>"))
     (GET "/:bucket/:key" [bucket key token]
       (srv-get context token bucket key))
     (PUT "/:bucket/:key" [bucket key token data]
@@ -73,11 +76,78 @@
       (srv-delete! context token bucket key))
     (cmpr/not-found "404 - Not Found")))
 
-(defn -main [& args]
-  (let [context {:storage (gen-storage-proxy (get-adapter-options) (get-bucket-storage-map))
-                 :memcached (gen-mc-conn)}
-        handler (gen-app-routes context)]
-    (prn (str "Starting storage server at" (java.util.Date.) "!"))
-    (s/run-server (-> handler
+(defprotocol App
+  (start! [_ env])
+  (stop! [_ system]))
+
+(def app
+  (reify App
+    (start! [_ env]
+      (let [storage (gen-storage-proxy (get-adapter-options env) (get-bucket-storage-map env))
+            memcached nil
+            context {:storage storage
+                     :memcached memcached}
+            handler (gen-app-routes context)
+            port (edn/read-string (or (env :server-port) "3000"))]
+        (println (str "Starting http storage server at " (java.util.Date.) " on port " port "!"))
+        {:context context
+         :handler (-> handler
                       (wrap-multipart-params)
-                      (wrap-defaults api-defaults)) {:port (Integer/parseInt (or (:http-port env) "3000"))})))
+                      (wrap-defaults api-defaults))
+         :server (s/run-server handler {:port port})
+         :stop! (fn [system] (when-let [server (system :server)] (server)))
+         :app _}))
+    (stop! [_ system]
+      (println (str "Shutting down http storage server at " (java.util.Date.) "!"))
+      (when-let [stop-fn (system :server)]
+        (stop-fn)
+        system))))
+
+(defn resolve-sym [sym]
+  (when-let [sym-ns (namespace sym)]
+    (require (symbol sym-ns)))
+  (ns-resolve *ns* sym))
+
+(defn get-app []
+  (deref (resolve-sym 'storage.core/app)))
+
+(defn start-app! [!instance env & app]
+  (let [instance (start! (or app (get-app)) env)]
+    (dosync
+      (ref-set !instance instance))
+    instance))
+
+(defn stop-app! [!instance]
+  (let [instance @!instance
+        app (instance :app)]
+    (stop! app instance)
+    (dosync
+      (ref-set !instance nil))
+    nil))
+
+(defn- get-env []
+  (deref (resolve-sym 'environ.core/env)))
+
+(defn- bind-user-tools! [!instance]
+  (intern 'user '!app !instance)
+  (intern 'user 'stop-app! #((deref (resolve-sym 'storage.core/stop-app!)) !instance))
+  (intern 'user 'reload-app! #((deref (resolve-sym 'storage.core/reload-dev-app!)) !instance)))
+
+(defn- reload-dev-app! [!instance & env]
+  (when @!instance
+    (stop-app! !instance))
+  (refresh)
+  ((deref (resolve-sym 'storage.core/bind-user-tools!)) !instance)
+  ((deref (resolve-sym 'storage.core/start-app!)) !instance (or env
+                                                                ((deref (resolve-sym 'storage.core/get-env))))))
+
+(defn start-dev! [!instance env]
+  (start-nrepl!)
+  (reload-dev-app! !instance))
+
+(defn -main [& [command & args]]
+  (let [!app (ref nil)
+        env environ/env]
+    (case (or command "main")
+      "dev" (start-dev! !app env)
+      "main" (start-app! !app env app))))
