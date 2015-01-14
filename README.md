@@ -31,6 +31,7 @@ Interaction with the service is done over HTTP via standard HTTP verbs:
 
 Options are configured via environment variables. Options below are also referenced as clojure-standard map keys.  For example :environ-var corresponds to ENVIRON_VAR.
 
+**_DEPRECATED_**
 * **:http-port** (HTTP_PORT) - It's a port ya dingus!  Binds at runtime.
 * **:file-storage-path** (FILE_STORAGE_PATH) - A base file path
 * **:aws-access-key** (AWS_ACCESS_KEY) - An aws access key for S3 storage
@@ -43,10 +44,10 @@ Options are configured via environment variables. Options below are also referen
 
 ## Examples
 
-* First start the service
+* First start the service with appropriate env variables preset
 
 ```shell
-FILE_STORAGE_PATH=/tmp BUCKET_STORAGE_MAP="{:some-bucket :file}" SERVER_PORT=3000 lein trampoline run main
+lein trampoline run main
 ```
 
 * Next you can use any HTTP client to interact, like `curl`
@@ -100,6 +101,8 @@ OpenJDK 64-Bit Server VM 1.7.0_65-b32
 ```
 
 _From here you can inspect the current instance via `!app` and reload the whole application (including code changes) via `reload-app!`_
+
+**_DEPRECATED_**
 ```
 user=> !app
 #<Ref@677c2c46: {:context {:storage #<store$gen_storage_proxy$reify__6557 storage.store$gen_storage_proxy$reify__6557@24ad3488>, :memcached nil}, :handler #<not_modified$wrap_not_modified$fn__2070 ring.middleware.not_modified$wrap_not_modified$fn__2070@33784d10>, :server #<clojure.lang.AFunction$1@4140e6f8>, :stop! #<core$reify__6639$fn__6640 storage.core$reify__6639$fn__6640@3e52f2e5>, :app #<core$reify__6639 storage.core$reify__6639@5abf3952>}>

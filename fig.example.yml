@@ -1,4 +1,4 @@
-http:
+storage:
   build: .
   working_dir: /usr/src/app
   command: lein trampoline run dev
@@ -10,10 +10,9 @@ http:
    - tmp/dev:/storage
   environment:
     STORAGE_ALIASES: >
-        {:s3 [:s3 {:aws-access-key nil :aws-secret-key nil}]
-         :local [:file {:file-storage-path nil}]}
-    BUCKET_STORAGE_MAP:
-    FILE_STORAGE_PATH: /storage
-    AWS_ACCESS_KEY:
-    AWS_SECRET_KEY:
-    HTTP_PORT: "3000"
+      {:s3 [storage.store.S3Storage {:access-key "", :secret-key ""}]
+       :local [storage.store.FileStorage {:base-path "/storage"}]}
+    BUCKET_ALIAS_MAP: >
+      {:some-bucket :local}
+    SERVE_PORT: "3000"
+    NREPL_PORT: "7888"
