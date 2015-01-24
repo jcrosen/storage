@@ -83,7 +83,7 @@
   ((get-sym 'storage.core/start-app!) !instance (get-sym 'environ.core/env)))
 
 (defn start-dev! [!instance env]
-  (start-nrepl!); (edn/read-string (or (env :nrepl-port) "7888")))
+  (start-nrepl! (edn/read-string (or (env :nrepl-port) "7888")))
   (reload-dev-app! !instance))
 
 (defn -main [& [command & args]]

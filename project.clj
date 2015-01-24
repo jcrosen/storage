@@ -20,5 +20,5 @@
   :plugins [[lein-environ "1.0.0"]]
   :app-class storage.core/app
   :main ^:skip-aot storage.core
-  :target-path "tmp/"
+  :target-path "target/"
   :profiles {:uberjar {:aot :all}})
